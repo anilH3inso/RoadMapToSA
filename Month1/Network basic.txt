@@ -1,0 +1,157 @@
+📍 Lesson 1 — Networks, Packets, and the TCP/IP Model
+
+
+---
+
+1. What is a Network?
+
+A network is simply a group of connected devices (computers, phones, servers, IoT devices) that can share information.
+In cybersecurity, the network is the battlefield — all traffic between devices flows here, so it’s where we detect, defend, and investigate.
+
+Two main types:
+
+LAN (Local Area Network) — e.g., your home Wi-Fi or office network.
+
+WAN (Wide Area Network) — e.g., the Internet.
+
+
+Why security analysts care:
+
+Malicious actors often enter through the network (phishing, exploits, brute force).
+
+Network logs and packet captures are gold mines for evidence.
+
+
+
+---
+
+2. Packets — the “letters” of the Internet
+
+Data on a network is broken into packets — small chunks that travel independently and are reassembled at the destination.
+
+Packet structure example:
+
+[Header: Source IP, Destination IP, Protocol, etc.] + [Payload: the actual data]
+
+Think of it like:
+
+Header → Address on an envelope (where it’s from, where it’s going, what “language” it’s in).
+
+Payload → The letter/message inside.
+
+
+
+---
+
+3. TCP/IP Model Overview
+
+The TCP/IP model is the blueprint for how data travels across networks.
+It has 4 layers (compared to the OSI model’s 7 layers):
+
+TCP/IP Layer	Example Protocols	What It Does
+
+Application	HTTP, HTTPS, DNS, SMTP	User-level data (websites, email, etc.)
+Transport	TCP, UDP	Splits data into chunks, controls flow
+Internet	IP, ICMP	Finds path across networks, handles addressing
+Network Access	Ethernet, Wi-Fi	Physical connection (cables, wireless)
+
+
+Why this matters to analysts:
+
+Knowing which layer an attack happens on helps pinpoint the detection tool.
+
+Example: DNS tunneling happens in Application layer, but DoS might be Transport or Internet layer.
+
+
+
+---
+
+4. Common Protocols You’ll Investigate
+
+HTTP/HTTPS — Web browsing (most phishing/malware C2 traffic hides here).
+
+DNS — Domain lookups (can be abused for tunneling malware traffic).
+
+SMTP — Email (often a phishing delivery path).
+
+TCP vs UDP — TCP is reliable, UDP is fast but connectionless.
+
+
+
+---
+
+5. Tools for Analysts at this Stage
+
+You’ll want these installed in your lab:
+
+Wireshark — packet capture and analysis.
+
+tcpdump — CLI packet capture tool.
+
+Nmap — network scanning & enumeration.
+
+nslookup / dig — DNS query tools.
+
+
+
+---
+
+🛠️ Mini-Lab: Capturing DNS & HTTP Traffic
+
+Goal: See the packets in action.
+
+1. Install Wireshark (if not already) → Download here.
+
+
+2. Open Wireshark → select your active network interface (Wi-Fi or Ethernet).
+
+
+3. Set a capture filter for DNS:
+
+port 53
+
+→ This will show only DNS queries.
+
+
+4. Visit a website (e.g., example.com) and watch DNS queries appear.
+
+
+5. Change the filter to HTTP:
+
+http
+
+→ Browse an HTTP site (non-HTTPS) and see the request/response in plaintext.
+
+
+
+Deliverable:
+
+Save the capture (File → Save As → dns_http_lab.pcap).
+
+Note the source IP, destination IP, and hostnames seen.
+
+
+
+---
+
+📌 Recap Questions (for your notes)
+
+1. What’s the difference between TCP and UDP in terms of reliability?
+
+
+2. In the TCP/IP model, which layer does DNS operate in?
+
+
+3. Why might attackers abuse DNS traffic for exfiltration?
+
+
+4. What’s inside a packet header vs payload?
+
+
+
+
+---
+
+If you want, our Lesson 2 will go deeper into TCP 3-Way Handshake and how to detect suspicious network behavior using Wireshark.
+
+Do you want me to move to Lesson 2 right now so we continue the momentum?
