@@ -1,116 +1,165 @@
-# 🧪 Wireshark Lab Setup Guide
+# 🧪 Wireshark Practice Lab (Vagrant + Libvirt)
 
-This guide explains how to set up and run the **Wireshark Practice Lab** on Parrot OS (or other Debian-based systems) using **Vagrant + Libvirt (KVM)**.  
+This project provides a reproducible, isolated Wireshark practice lab using **Vagrant**, **libvirt/QEMU**, and **Ubuntu 22.04** base boxes.  
+The lab simulates a small network with realistic traffic flows between:
+
+- **Router** (`ws-router`)
+- **Server** (`ws-server`)
+- **Victim** (`ws-victim`)
+- **Sensor** (`ws-sensor`)
+- **Attacker** (`ws-attacker`)
+
+PCAPs can be captured on the sensor and analyzed with **Wireshark/Tshark**.
 
 ---
 
-## 📂 Step 1: Unzip the Lab Files
+## ⚙️ 1. Prerequisites
+
+Make sure hardware virtualization is enabled in BIOS/UEFI (**Intel VT-x / AMD-V**).  
+Check support:
+
 ```bash
-unzip wireshark_lab.zip
-cd wireshark_lab/documentation
-cherrytree Setuplab.ctb
+lscpu | grep -i virtualization
 ```
 
----
+Expected: `VT-x` (Intel) or `AMD-V`.
 
-## 🔧 Step 2: Install Packages and Load KVM Modules
-Install the virtualization stack:
+Install required system packages:
+
 ```bash
 sudo apt update
-sudo apt install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils virt-manager cpu-checker
+sudo apt install -y qemu-system-x86 \
+  libvirt-daemon-system libvirt-daemon-driver-qemu libvirt-clients \
+  bridge-utils virt-manager \
+  curl gpg lsb-release build-essential pkg-config
 ```
 
-Load KVM kernel modules:
-```bash
-# Check your CPU vendor
-lscpu | grep 'Vendor ID'
+Enable libvirtd and add yourself to the correct groups:
 
-# Common base
-sudo modprobe kvm
-
-# For Intel CPUs
-sudo modprobe kvm_intel
-
-# For AMD CPUs
-sudo modprobe kvm_amd
-
-# Verify device node
-ls -l /dev/kvm
-```
-
----
-
-## 🔧 Step 3: Verify KVM Support
-```bash
-kvm-ok
-```
-
-```plaintext
-Expected output:
-INFO: /dev/kvm exists
-KVM acceleration can be used
-```
-
----
-
-## 🔧 Step 4: Enable and Start libvirtd
 ```bash
 sudo systemctl enable --now libvirtd
-```
-
-```bash
-# Add your user to groups
 sudo usermod -aG kvm,libvirt $USER
 newgrp libvirt
 ```
 
+---
+
+## 📦 2. Vagrant Setup
+
+> ⚠️ On Parrot/Debian, the distro Vagrant package may be broken. Use the official HashiCorp build if `/usr/bin/vagrant` is missing.
+
+### Install from HashiCorp:
+
 ```bash
-# Check service status
-systemctl is-active libvirtd
+sudo apt purge -y vagrant ruby-vagrant || true
+sudo rm -f /usr/bin/vagrant
+
+curl -fsSL https://apt.releases.hashicorp.com/gpg \
+  | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] \
+https://apt.releases.hashicorp.com $(lsb_release -cs) main" \
+  | sudo tee /etc/apt/sources.list.d/hashicorp.list
+
+sudo apt update
+sudo apt install -y vagrant
+```
+
+### Install libvirt provider plugin:
+
+```bash
+vagrant plugin install vagrant-libvirt
+vagrant plugin update vagrant-libvirt
+```
+
+Verify:
+
+```bash
+vagrant --version
+vagrant plugin list
 ```
 
 ---
 
-## 🚀 Step 5: Bring Up the Lab
+## 📂 3. Project Setup
+
+Clone/unzip this repo:
+
 ```bash
-export LIBVIRT_DEFAULT_URI=qemu:///system
-VAGRANT_DEFAULT_PROVIDER=libvirt vagrant up
+cd ~/Desktop
+unzip wireshark_lab.zip -d wireshark_lab
+cd wireshark_lab
+```
+
+Run the one-time setup script:
+
+```bash
+chmod +x setup_lab.sh
+./setup_lab.sh ~/Desktop/wireshark_lab
+```
+
+This will:
+- Install missing dependencies
+- Fix permissions
+- Patch `Vagrantfile` with sane defaults (`machine_type = "q35"`, `cpu_mode = "host-model"`)
+- Force software QEMU if `/dev/kvm` is missing
+- Create `.env-vagrant` with environment exports
+
+---
+
+## ▶️ 4. Starting the Lab
+
+Always load the environment variables:
+
+```bash
+source .env-vagrant
+```
+
+Bring the lab up (serial to avoid libvirt race conditions):
+
+```bash
+vagrant up --no-parallel
+```
+
+Check domains:
+
+```bash
+virsh -c qemu:///system list --all
 ```
 
 ---
 
-## ⚠️ Troubleshooting
-```plaintext
-- No /dev/kvm device:
-  → Enable Intel VT-x or AMD-V (SVM) in BIOS/UEFI
-  → Disable Secure Boot if modules are blocked
-  → If running Parrot inside VirtualBox/VMware/Hyper-V, enable nested virtualization on the outer host
+## 🔍 5. Sanity Checks
+
+Router forwarding & addresses:
+```bash
+vagrant ssh ws-router -c "ip a; sysctl net.ipv4.ip_forward"
 ```
 
----
-
-## 🛠️ Sanity Checks
+Server reachable:
 ```bash
-# Router forwarding and addresses
-vagrant ssh ws-router  -c "ip a; sysctl net.ipv4.ip_forward"
+vagrant ssh ws-server -c "curl -s http://10.20.20.20 | head"
+```
 
-# Server reachable from its own subnet
-vagrant ssh ws-server  -c "curl -s http://10.20.20.20 | head"
+Victim ↔ Server connectivity:
+```bash
+vagrant ssh ws-victim -c "ping -c2 10.20.20.20"
+vagrant ssh ws-victim -c "dig +short server.lab.local @10.20.20.20"
+```
 
-# Victim ↔ Server connectivity
-vagrant ssh ws-victim  -c "ping -c2 10.20.20.20"
-vagrant ssh ws-victim  -c "dig +short server.lab.local @10.20.20.20"
+Sensor capture test:
+```bash
+vagrant ssh ws-sensor -c "/opt/capture/cap_netA.sh & sleep 3; pkill tshark; ls -l ~/*.pcapng"
+```
 
-# Sensor capture quick test
-vagrant ssh ws-sensor  -c "/opt/capture/cap_netA.sh & sleep 3; pkill tshark; ls -l ~/*.pcapng"
-
-# Attacker activity
+Attacker activity:
+```bash
 vagrant ssh ws-attacker -c "nmap -sS -p 1-1000 10.20.20.20"
 ```
 
 ---
 
-## 📡 Generate Traffic
+## 🧰 6. Traffic Generation
+
 Victim:
 ```bash
 vagrant ssh ws-victim
@@ -126,47 +175,77 @@ python3 /opt/traffic/beacon.py &
 sudo hping3 -S -p 80 -c 50 10.20.20.20
 ```
 
-Sensor (captures):
+Sensor (capture and copy PCAPs to host):
 ```bash
 vagrant ssh ws-sensor
 /opt/capture/cap_netA.sh
 /opt/capture/cap_netB.sh
-```
 
-Copy PCAPs to host:
-```bash
+# Copy PCAPs out
 vagrant scp ws-sensor:~/*.pcapng ./captures/
 ```
 
 ---
 
-## 🔍 Wireshark / Tshark Exercises
-```plaintext
-- SYN scan detection: tcp.flags.syn == 1 && tcp.flags.ack == 0
-- Beaconing: filter http.request.method == "GET" and check inter-arrival deltas / IO Graphs
-- FTP creds in clear: ftp.request.command == "USER" || ftp.request.command == "PASS"
-- DNS oddities / exfil markers: dns && !(dns.qry.name contains "lab.local")
-- TLS handshake sanity: tls.handshake → verify versions/ciphers, JA3, SNI
-- Reassemble HTTP object: Follow TCP Stream or use tshark -q -z http,stat,1 -r file.pcapng
-```
+## 🔎 7. Wireshark/Tshark Exercises
+
+- **SYN scan detection**  
+  `tcp.flags.syn == 1 && tcp.flags.ack == 0`
+
+- **Beaconing**  
+  `http.request.method == "GET"` and check inter-arrival deltas
+
+- **FTP creds in clear**  
+  `ftp.request.command == "USER" || ftp.request.command == "PASS"`
+
+- **DNS oddities**  
+  `dns && !(dns.qry.name contains "lab.local")`
+
+- **TLS sanity**  
+  Inspect `tls.handshake` versions, ciphers, JA3, SNI
 
 ---
 
-## 🧱 Hardening & Isolation
-```bash
-# Block anything but intra-lab on router with nftables
-sudo nft add rule inet filter forward ip daddr != {10.10.10.0/24,10.20.20.0/24} drop
+## 🔒 8. Hardening & Isolation
 
-# Snapshotting
+By default, libvirt networks use `forward_mode: none` (no external egress).  
+Extra firewall rule on router:
+
+```bash
+sudo nft add rule inet filter forward ip daddr != {10.10.10.0/24,10.20.20.0/24} drop
+```
+
+Snapshot baseline after first successful boot:
+
+```bash
 vagrant snapshot save baseline
 ```
 
 ---
 
-## 🔄 Lifecycle
+## 🛠️ 9. Troubleshooting
+
+- **/dev/kvm missing** → enable Intel VT-x / AMD-V in BIOS/UEFI, or enable nested virtualization if inside a VM.
+- **Connection refused on SSH** → VM still booting, cloud-init not finished, or sshd not started.
+- **Preferred machine type errors** → set `libvirt.machine_type = "q35"` (or `"pc"`) in `Vagrantfile`.
+- **Slow first boot** → add:
+  ```ruby
+  config.vm.boot_timeout = 600
+  config.ssh.keep_alive  = true
+  ```
+- **Network stuck** → restart network:
+  ```bash
+  sudo virsh net-destroy vagrant-libvirt
+  sudo virsh net-start vagrant-libvirt
+  ```
+
+---
+
+## 📚 10. Lifecycle
+
 ```bash
 # Start lab
-vagrant up
+vagrant up --no-parallel
 
 # Pause / resume
 vagrant suspend
@@ -181,7 +260,8 @@ vagrant destroy -f
 
 ---
 
-## 📑 Quick Commands Cheat Sheet
+## ✅ 11. Cheat Sheet
+
 Victim:
 ```bash
 curl http://server.lab.local
@@ -201,7 +281,7 @@ Sensor:
 /opt/capture/cap_netB.sh
 ```
 
-Server self-test:
+Server:
 ```bash
 curl -s http://10.20.20.20 | head
 ```
@@ -214,5 +294,4 @@ sudo nft list ruleset
 
 ---
 
-## 📝 License
-This lab setup is provided for **educational and testing purposes only**.  
+Done! 🎉 You now have a reproducible Wireshark practice lab with realistic traffic and capture paths.
