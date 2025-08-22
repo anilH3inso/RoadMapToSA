@@ -117,7 +117,10 @@ source .env-vagrant
 Bring the lab up (serial to avoid libvirt race conditions):
 
 ```bash
-vagrant up --no-parallel
+vagrant up ws-router --no-parallel
+vagrant up ws-server --no-parallel
+vagrant up ws-victim --no-parallel
+vagrant up ws-attacker --no-parallel
 ```
 
 Check domains:
