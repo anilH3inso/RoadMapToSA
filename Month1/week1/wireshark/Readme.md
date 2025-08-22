@@ -1,71 +1,97 @@
-### Follow the steps
-1. Unzip wireshark_lab.zip
-2. go to documentation file 
-3. open Setuplab.ctb in cherry tree app 
+# 🧪 Wireshark Lab Setup Guide
 
+This guide explains how to set up and run the **Wireshark Practice Lab** on Parrot OS (or other Debian-based systems) using **Vagrant + Libvirt (KVM)**.  
 
-🔧 Step 1: Install required packages
+---
 
+## 📂 Step 1: Unzip the Lab Files
+```bash
+unzip wireshark_lab.zip
+cd wireshark_lab/documentation
+Open the CherryTree file for documentation:
+
+bash
+Copy
+Edit
+cherrytree Setuplab.ctb
+🔧 Step 2: Install Required Packages
 Make sure the virtualization stack is installed:
 
+bash
+Copy
+Edit
 sudo apt update
 sudo apt install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils virt-manager cpu-checker
-
-🔧 Step 2: Load KVM kernel modules
-
+🔧 Step 3: Load KVM Kernel Modules
 Check your CPU vendor:
 
+bash
+Copy
+Edit
 lscpu | grep 'Vendor ID'
+Load the appropriate kernel modules:
 
-
-Then run:
-
+bash
+Copy
+Edit
 # Common base
 sudo modprobe kvm
 
-# For Intel CPUs:
+# For Intel CPUs
 sudo modprobe kvm_intel
 
-# For AMD CPUs:
-# sudo modprobe kvm_amd
+# For AMD CPUs
+sudo modprobe kvm_amd
+Verify that the device node exists:
 
-
-👉 Now check if the device node appeared:
-
+bash
+Copy
+Edit
 ls -l /dev/kvm
-
-🔧 Step 3: Verify KVM support
+🔧 Step 4: Verify KVM Support
+bash
+Copy
+Edit
 kvm-ok
+plaintext
+Copy
+Edit
+Expected output:
+INFO: /dev/kvm exists
+KVM acceleration can be used
+🔧 Step 5: Enable and Start libvirtd
+Enable the libvirt service:
 
-
-Expected:
-INFO: /dev/kvm exists KVM acceleration can be used
-
-🔧 Step 4: Enable and start libvirtd
+bash
+Copy
+Edit
 sudo systemctl enable --now libvirtd
+Add your user to the necessary groups:
 
-
-Also add your user to groups so you don’t need root every time:
-
+bash
+Copy
+Edit
 sudo usermod -aG kvm,libvirt $USER
 newgrp libvirt
+Check service status:
 
-
-Check:
-
+bash
+Copy
+Edit
 systemctl is-active libvirtd
+🚀 Step 6: Bring Up the Lab
+From your lab directory:
 
-🔧 Step 5: Retry Vagrant
-
-Now from your lab directory:
-
+bash
+Copy
+Edit
 export LIBVIRT_DEFAULT_URI=qemu:///system
 VAGRANT_DEFAULT_PROVIDER=libvirt vagrant up
-
-⚠️ If /dev/kvm still doesn’t appear:
-
-BIOS/UEFI issue → Reboot and enable Intel VT-x or AMD-V (SVM).
-
-Secure Boot enabled → Sometimes blocks KVM modules → disable Secure Boot in BIOS.
-
-Nested VM → If Parrot is running inside VirtualBox/VMware/Hyper-V, you’ll need to enable nested virtualization on the outer host (tell me your outer hypervisor and I’ll give you the exact command).
+⚠️ Troubleshooting
+plaintext
+Copy
+Edit
+- No /dev/kvm device:
+  → Enable Intel VT-x or AMD-V (SVM) in BIOS/UEFI
+  → Disable Secure Boot if modules are blocked
+  → If running Parrot inside VirtualBox/VMware/Hyper-V, enable nested virtualization on the outer ho
